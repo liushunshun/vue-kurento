@@ -1,0 +1,21 @@
+{
+  "name": "vue-kurento",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "lint": "vue-cli-service lint"
+  },
+  "dependencies": {
+    "element-plus": "^2.2.36",
+    "kurento-utils": "^6.18.0",
+    "vue": "^3.2.47",
+    "webrtc-adapter": "^8.1.1"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-typescript": "^5.0.8",
+    "@vue/cli-service": "~5.0.0",
+    "typescript": "^4.9.5"
+  }
+}
