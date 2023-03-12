@@ -34,7 +34,8 @@ const form = reactive({
 });
 let videoInput: HTMLVideoElement;
 let videoOutput: HTMLVideoElement;
-let peerABC: any;
+let webRtcPeer: any;
+let from: string;
 //===============================页面加载或关闭自动执行逻辑================================
 
 window.onload = function () {
@@ -77,14 +78,15 @@ function call() {
         onicecandidate: onIceCandidate,
         onerror: () => curentPlayState.value = PlayState.PLAY_STATE_IDLE,
     }
-    peerABC = WebRtcPeer.WebRtcPeer.WebRtcPeerSendrecv(options, handleError);
+    webRtcPeer = WebRtcPeer.WebRtcPeer.WebRtcPeerSendrecv(options, handleRtcResult);
 }
 
-function handleError(error: string | undefined) {
+function handleRtcResult(error: string | undefined) {
     if (error) {
+        console.error("open webrtc handle error : ", error);
         return console.error(error);
     }
-    peerABC.generateOffer(onOfferCall);
+    webRtcPeer.generateOffer(onOfferCall);
 }
 
 function onIceCandidate(candidate: any) {
@@ -98,9 +100,10 @@ function onIceCandidate(candidate: any) {
 }
 
 function onOfferCall(error: string | undefined, sdp: string) {
-    if (error)
+    if (error) {
         return console.error('Error generating the offer');
-    console.log('Invoking SDP offer callback function');
+    }
+    console.log('Invoking SDP offer callback function : ', sdp);
     var message = {
         id: 'call',
         from: form.name,
@@ -145,7 +148,7 @@ function register() {
     document.getElementById("peerName")?.focus();
 }
 //===============================与服务端通信（websocket)================================
-const ws = new WebSocket("ws://127.0.0.1:8080/ws");
+const ws = new WebSocket("wss://192.168.1.10:8011/ws");
 ws.onmessage = function (message) {
     console.log("Front page received message : " + message.data)
     let data = JSON.parse(message.data);
@@ -172,10 +175,10 @@ ws.onmessage = function (message) {
             break;
         }
         case "iceCandidate": {
-            // webRtcPeer.addIceCandidate(parsedMessage.candidate, function(error) {
-            // if (error)
-            // 	return console.error('Error adding candidate: ' + error);
-            // });
+            webRtcPeer.addIceCandidate(data.candidate, function (error: string) {
+                if (error)
+                    return console.error('Error adding candidate: ' + error);
+            });
             break;
         }
         default:
@@ -207,10 +210,10 @@ function callResponse(data: any) {
     } else {
         curentPlayState.value = PlayState.PLAY_STATE_STARTED;
 
-        //webRtcPeer.processAnswer(message.sdpAnswer, function(error) {
-        // 	if (error)
-        // 		return console.error(error);
-        // });
+        webRtcPeer.processAnswer(data.sdpAnswer, function (error: string) {
+            if (error)
+                return console.error(error);
+        });
     }
 }
 function incomingCall(data: any) {
@@ -226,7 +229,21 @@ function incomingCall(data: any) {
     }
     curentPlayState.value = PlayState.PLAY_STATE_STARTING;
     if (confirm("User " + data.from + " is calling you. Do you accept the call?")) {
-        //process video
+        showSpinner();
+        from = data.from;
+        var options = {
+            localVideo: videoInput,
+            remoteVideo: videoOutput,
+            onicecandidate: onIceCandidate,
+            onerror: onError
+        }
+        webRtcPeer = WebRtcPeer.WebRtcPeer.WebRtcPeerSendrecv(options,
+            function (error) {
+                if (error) {
+                    return console.error(error);
+                }
+                webRtcPeer.generateOffer(onOfferIncomingCall);
+            });
     } else {
         var response = {
             id: 'incomingCallResponse',
@@ -238,6 +255,20 @@ function incomingCall(data: any) {
         //stop();
     }
 }
+function onOfferIncomingCall(error: string, offerSdp: string) {
+    if (error)
+        return console.error("Error generating the offer");
+    var response = {
+        id: 'incomingCallResponse',
+        from: from,
+        callResponse: 'accept',
+        sdpOffer: offerSdp
+    };
+    sendMessage(response);
+}
+function onError() {
+    curentPlayState.value = PlayState.PLAY_STATE_IDLE;
+}
 function sendMessage(message: any) {
     let jsonMessage = JSON.stringify(message);
     console.log("Front page send message : " + jsonMessage);
@@ -246,7 +277,10 @@ function sendMessage(message: any) {
 
 function startCommunication(data: any) {
     curentPlayState.value = PlayState.PLAY_STATE_STARTED;
-    //
+    webRtcPeer.processAnswer(data.sdpAnswer, function (error: string) {
+        if (error)
+            return console.error(error);
+    });
 }
 
 //===============================播放器================================
