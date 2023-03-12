@@ -113,14 +113,32 @@ function onOfferCall(error: string | undefined, sdp: string) {
     sendMessage(message);
 }
 
-function stop() {
+function stop(send: boolean | undefined) {
     curentPlayState.value = PlayState.PLAY_STATE_IDLE;
+    if (webRtcPeer) {
+        webRtcPeer.dispose();
+        webRtcPeer = null;
+
+        if (!send) {
+            sendMessage({ id: 'stop' });
+        }
+    }
+    hideSpinner();
 }
 function showSpinner() {
-    videoInput.poster = "/src/assets/transparent-1px.png";
-    videoInput.style.background = 'center transparent url("/src/assets/spinner.gif") no-repeat';
-    videoOutput.poster = "/src/assets/transparent-1px.png";
-    videoOutput.style.background = 'center transparent url("/src/assets/spinner.gif") no-repeat';
+    videoInput.poster = "@/assets/transparent-1px.png";
+    videoInput.style.background = 'center transparent url("@/assets/spinner.gif") no-repeat';
+    videoOutput.poster = "@/assets/transparent-1px.png";
+    videoOutput.style.background = 'center transparent url("@/assets/spinner.gif") no-repeat';
+}
+
+function hideSpinner() {
+    videoInput.poster = "@/assets/webrtc.png";
+    videoInput.style.background = '';
+    videoInput.src = '';
+    videoOutput.poster = "@/assets/webrtc.png";
+    videoOutput.style.background = '';
+    videoOutput.src = '';
 }
 //===============================会话注册控制================================
 enum RegisterState {
@@ -171,7 +189,7 @@ ws.onmessage = function (message) {
         }
         case "stopCommunication": {
             console.info('Communication ended by remote peer');
-            //stop(true);
+            stop(true);
             break;
         }
         case "iceCandidate": {
@@ -206,7 +224,7 @@ function callResponse(data: any) {
         var errorMessage = data.message ? data.message
             : 'Unknown reason for call rejection.';
         console.log(errorMessage);
-        //todo stop()
+        stop(false);
     } else {
         curentPlayState.value = PlayState.PLAY_STATE_STARTED;
 
@@ -252,7 +270,7 @@ function incomingCall(data: any) {
             message: 'user declined'
         };
         sendMessage(response);
-        //stop();
+        stop(false);
     }
 }
 function onOfferIncomingCall(error: string, offerSdp: string) {
